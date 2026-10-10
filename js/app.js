@@ -519,7 +519,7 @@ function addLayers() {
       "text-variable-anchor-offset": ["literal", ["left", [1.55, 0], "right", [-1.55, 0], "top", [0, 1.7], "bottom", [0, -1.45]]],
       "icon-image": ["concat", "tt-plate-", ["get", "agency"]], // fitted around the number
       "icon-text-fit": "both",
-      "icon-text-fit-padding": [-0.5, 3, 1.5, 3],
+      "icon-text-fit-padding": [0.5, 3, 0.5, 3],
       "text-padding": 2,
       "symbol-sort-key": ["get", "labelOrder"],
     },
