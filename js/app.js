@@ -1395,12 +1395,14 @@ function startTracking(t, stopKey) {
   saveTracked();
   state.trackPicker = null;
   checkTracked();
+  applySelectionFilter();
   renderAll();
 }
 
 function untrack(id, message) {
   state.tracked = state.tracked.filter((r) => r.id !== id);
   saveTracked();
+  applySelectionFilter();
   if (message) toast(message);
   renderAll();
 }
@@ -1525,13 +1527,17 @@ function renderAll() {
 function applySelectionFilter() {
   if (!map.getLayer("tt-halo")) return;
   const id = state.selected || "", sid = state.station || "";
-  for (const l of ["tt-ping", "tt-halo-shadow", "tt-halo", "tt-label-selected"]) map.setFilter(l, ["==", ["get", "id"], id]);
-  map.setFilter("tt-labels", ["!=", ["get", "id"], id]);
+  // The selected train and every tracked train get the highlight: rim, ping
+  // and plate callout.
+  const ids = [...new Set([id, ...state.tracked.map((r) => r.id)].filter(Boolean))];
+  const highlighted = ["in", ["get", "id"], ["literal", ids]];
+  for (const l of ["tt-ping", "tt-halo-shadow", "tt-halo", "tt-label-selected"]) map.setFilter(l, highlighted);
+  map.setFilter("tt-labels", ["!", highlighted]);
   for (const l of ["tt-station-ping", "tt-station-shadow", "tt-station-selected", "tt-station-selected-label", "tt-footprint-selected"]) {
     map.setFilter(l, ["==", ["get", "id"], sid]);
   }
   map.setFilter("tt-station-labels", ["!=", ["get", "id"], sid]); // the callout replaces its plain label
-  ping(Boolean(id || sid));
+  ping(Boolean(ids.length || sid));
 }
 
 // A ring that grows and fades from the selected train or station, then
