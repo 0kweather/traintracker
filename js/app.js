@@ -163,44 +163,44 @@ function tagImage(fill) {
   };
 }
 
-// The selected train's callout: a milepost plate like the one in the panel,
-// white with a black outline and the railroad's color across the top. It
-// stretches sideways to fit the number.
+// Each train's label on the map: a small milepost plate like the one in the
+// panel, white with a black outline and the railroad's color across the top.
+// It stretches sideways to fit the number.
 function plateImage(color) {
-  const ratio = 2, w = 40, h = 40, c = document.createElement("canvas");
+  const ratio = 2, w = 32, h = 30, c = document.createElement("canvas");
   c.width = w * ratio;
   c.height = h * ratio;
   const g = c.getContext("2d");
   g.scale(ratio, ratio);
-  const x = 3, y = 2, pw = 34, ph = 34, band = 5;
+  const x = 2, y = 1, pw = 28, ph = 26, band = 4, r = 4;
   g.save();
-  g.shadowColor = "rgba(0,0,0,0.3)";
-  g.shadowBlur = 4;
+  g.shadowColor = "rgba(0,0,0,0.25)";
+  g.shadowBlur = 3;
   g.shadowOffsetY = 1;
   g.beginPath();
-  g.roundRect(x, y, pw, ph, 5);
+  g.roundRect(x, y, pw, ph, r);
   g.fillStyle = "#fff";
   g.fill();
   g.restore();
   g.save();
   g.beginPath();
-  g.roundRect(x, y, pw, ph, 5);
+  g.roundRect(x, y, pw, ph, r);
   g.clip();
   g.fillStyle = color;
   g.fillRect(x, y, pw, band);
   g.restore();
   g.beginPath();
-  g.roundRect(x + 0.75, y + 0.75, pw - 1.5, ph - 1.5, 4.5);
-  g.lineWidth = 1.5;
+  g.roundRect(x + 0.6, y + 0.6, pw - 1.2, ph - 1.2, r - 0.6);
+  g.lineWidth = 1.2;
   g.strokeStyle = "#121417";
   g.stroke();
   return {
     image: g.getImageData(0, 0, c.width, c.height),
     options: {
       pixelRatio: ratio,
-      stretchX: [[10 * ratio, 30 * ratio]],
-      stretchY: [[16 * ratio, 26 * ratio]],
-      content: [8 * ratio, (y + band + 2) * ratio, 32 * ratio, (y + ph - 3) * ratio],
+      stretchX: [[8 * ratio, 24 * ratio]],
+      stretchY: [[10 * ratio, 21 * ratio]],
+      content: [6 * ratio, (y + band + 1) * ratio, 26 * ratio, (y + ph - 3) * ratio],
     },
   };
 }
@@ -501,56 +501,27 @@ function addLayers() {
     paint: { "icon-opacity": ["case", ["get", "stale"], 0.45, 1] },
   });
 
-  // Labels only appear once there's room for them, and collide with each
-  // other instead of piling up — intercity trains win ties.
-  // "Amtrak 171" from zoom 8; the line name joins it underneath from zoom 10.
-  const labelText = ["step", ["zoom"],
-    ["get", "label"],
-    10, ["format",
-      ["get", "label"], {},
-      ["case", [">", ["length", ["get", "subtitle"]], 0], ["concat", "\n", ["get", "subtitle"]], ""],
-      { "font-scale": 0.85, "text-font": ["literal", ["Noto Sans Regular"]] }]];
-  const labelLayout = {
-    "text-field": labelText,
-    "text-font": ["Noto Sans Bold"],
-    "text-size": ["interpolate", ["linear"], ["zoom"], 5, 11, 10, 13],
-    "text-variable-anchor": ["left", "right", "top", "bottom"],
-    "text-radial-offset": ["interpolate", ["linear"], ["zoom"], 5, 0.75, 10, 1.1],
-    "text-justify": "auto",
-    "text-padding": 3,
-    "symbol-sort-key": ["get", "labelOrder"],
-  };
-  const labelPaint = { "text-color": colors.text, "text-halo-color": colors.halo, "text-halo-width": 1.6 };
-
+  // Each train is labeled with its plate once there's room for it. Plates
+  // collide with each other instead of piling up, and intercity trains win
+  // ties. The selected and tracked trains' plates are placed first and shown
+  // at every zoom (see applySelectionFilter); they stay in this layer so
+  // selecting a train never makes its plate blink.
   map.addLayer({
     id: "tt-labels",
     type: "symbol",
     source: "trains",
-    minzoom: 8, // zoomed further out, trains are unlabeled dots
-    filter: ["!=", ["get", "id"], ""],
-    layout: labelLayout,
-    paint: labelPaint,
-  });
-
-  map.addLayer({
-    id: "tt-label-selected",
-    type: "symbol",
-    source: "trains",
-    filter: trainSel,
+    filter: [">=", ["zoom"], 8], // zoomed further out, trains are unlabeled dots
     layout: {
       "text-field": ["get", "plate"],
       "text-font": ["Noto Sans Bold"],
-      "text-size": 16,
-      "text-anchor": "left",
-      "text-offset": [1.9, 0],
+      "text-size": ["interpolate", ["linear"], ["zoom"], 8, 11, 12, 12],
+      // Beside the marker, clear of the white rim; the first one that fits wins.
+      "text-variable-anchor-offset": ["literal", ["left", [1.55, 0], "right", [-1.55, 0], "top", [0, 1.7], "bottom", [0, -1.45]]],
       "icon-image": ["concat", "tt-plate-", ["get", "agency"]], // fitted around the number
       "icon-text-fit": "both",
-      "icon-text-fit-padding": [1, 6, 1, 6],
-      // Always shown, and other labels placed after it move out of its way.
-      "text-allow-overlap": true,
-      "icon-allow-overlap": true,
-      "text-ignore-placement": false,
-      "icon-ignore-placement": false,
+      "icon-text-fit-padding": [-0.5, 3, 1.5, 3],
+      "text-padding": 2,
+      "symbol-sort-key": ["get", "labelOrder"],
     },
     paint: { "text-color": "#121417" },
   });
@@ -621,9 +592,6 @@ function featureCollection() {
         agency: t.agency,
         color: AGENCIES[t.agency].color,
         plate: t.number || AGENCIES[t.agency].short,
-        label: labelFor(t),
-        // Second label line, shown when zoomed in; skipped if the label already names the line.
-        subtitle: t.number && t.route ? t.route : "",
         bearing: targetOf(t).bearing ?? 0,
         hasBearing: targetOf(t).bearing != null,
         intercity,
@@ -1527,12 +1495,13 @@ function renderAll() {
 function applySelectionFilter() {
   if (!map.getLayer("tt-halo")) return;
   const id = state.selected || "", sid = state.station || "";
-  // The selected train and every tracked train get the highlight: rim, ping
-  // and plate callout.
+  // The selected train and every tracked train get the highlight (rim and
+  // ping), and their plates win any collision and show at every zoom.
   const ids = [...new Set([id, ...state.tracked.map((r) => r.id)].filter(Boolean))];
   const highlighted = ["in", ["get", "id"], ["literal", ids]];
-  for (const l of ["tt-ping", "tt-halo-shadow", "tt-halo", "tt-label-selected"]) map.setFilter(l, highlighted);
-  map.setFilter("tt-labels", ["!", highlighted]);
+  for (const l of ["tt-ping", "tt-halo-shadow", "tt-halo"]) map.setFilter(l, highlighted);
+  map.setFilter("tt-labels", ["any", highlighted, [">=", ["zoom"], 8]]);
+  map.setLayoutProperty("tt-labels", "symbol-sort-key", ["case", highlighted, -1, ["get", "labelOrder"]]);
   for (const l of ["tt-station-ping", "tt-station-shadow", "tt-station-selected", "tt-station-selected-label", "tt-footprint-selected"]) {
     map.setFilter(l, ["==", ["get", "id"], sid]);
   }

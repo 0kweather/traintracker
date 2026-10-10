@@ -237,10 +237,12 @@ function parseMta(agency, buf, meta) {
     const last = prog.list[prog.list.length - 1];
     const nextStop = prog.dwelling ? prog.at : prog.next;
     const delaySec = nextStop.arrival?.delay ?? nextStop.departure?.delay;
-    // LIRR trip ids end in the train number; Metro-North puts it in the vehicle label.
+    // LIRR trip ids carry the train number after the schedule prefix
+    // ("GO202_26_6754", sometimes with a suffix like "_1" or "_2953_METS");
+    // Metro-North puts it in the vehicle label.
     const number = agency === "mnr"
       ? vp?.vehicle?.label || tu.vehicle?.label || tripId
-      : (tripId || "").split("_").pop();
+      : (tripId || "").match(/^[A-Z]+\d*_\d+_(\d+)/)?.[1] || (tripId || "").split("_").pop();
     out.push(train({
       id: `${agency}:${tripId}`,
       agency,
