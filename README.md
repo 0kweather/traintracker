@@ -29,7 +29,8 @@ Northstar (Minneapolis) ended rail service; its route is now a bus, so it isn't 
 ## Using it
 
 - **Stations:** every station on these railroads is on the map (intercity stops from regional zoom, commuter stops once you zoom into a metro area). Click one, or search for it, to see which railroads and lines serve it and the next trains due, with live predicted times and delays. Stations shared by several railroads, like New York Penn or Boston South Station, appear as one stop. MBTA stations show the MBTA's own live predictions. For railroads whose feeds don't list stops, the panel shows the trains nearby.
-- **Settings** (gear button): light/dark/auto appearance, **Units** (miles or kilometers, for speeds and distances; the default follows your browser's language), and **Show stations**.
+- **Settings** (gear button): light/dark/auto appearance, **Units** (miles or kilometers, for speeds and distances; the default follows your browser's language), **Show stations**, and **Catch unreported delays**.
+- **Unreported delays.** Railroads often keep showing a train on time well after it's fallen behind. Milepost checks each GPS fix against the posted times: a train still at the platform after its posted departure (and not moving), or still too far from its next stop to make the posted arrival even running at 1.5× its scheduled pace, is at least that late. Milepost only counts delay the GPS proves, never extrapolates past the last fix, and pushes later stops back by the timetable's running times unless the feed already shows them later. These delays are underlined with dots, and the train page says what the GPS showed. Works for Amtrak, VIA and LIRR trains reporting GPS. Brightline is skipped because its feed doesn't say when a position was taken. It's on by default and can be turned off in Settings (`js/delays.js`).
 - **Rail lines are colored by network.** Each stretch of track takes the color of the railroads that run passenger trains on it, and shared track (Amtrak and Metro-North on the New Haven Line, for example) is drawn as side-by-side strands, one per railroad. Hover a line to see who runs on it. Railroads come from USDOT's track ownership and trackage-rights codes, plus the nearest commuter station for commuter trains on freight-owned track.
 - **Trains sit on the track.** Reported positions are snapped to the nearest rail line within 1.5 km, preferring the train's own railroad when it's about as close. The rail lines form a graph, so trains placed from the timetable (Metro-North) and slide animations follow the track between two points (a shortest-path route) instead of cutting across curves.
 - **Stations sit on the track** too: each is drawn at the nearest point on its railroad's track within 400 m. Terminals like Boston South Station, whose tracks end short of the building, sit at the end of the platforms.
@@ -71,6 +72,7 @@ data/mta.json             LIRR/Metro-North station + branch lookups
 data/rail.geojson         US and Canadian passenger main lines (USDOT NTAD) tagged by network, merged into continuous lines
 data/stations.json        stations for every railroad (NTAD, Amtraker, agency GTFS)
 js/stations.js            station merging and "next trains" lookups
+js/delays.js              delays the GPS proves but the railroad hasn't posted
 js/estimate.js            rail index: snapping to track and routing along it
 js/networks.js            rail network names and colors
 scripts/                  rebuild the data files; local dev relay

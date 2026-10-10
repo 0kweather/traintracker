@@ -3,6 +3,7 @@ import { loadStations, trainsDue, mbtaPredictions, meters } from "./stations.js?
 import { RailIndex, snapToTrack } from "./estimate.js?v=dev";
 import { NETWORKS, networkColor } from "./networks.js?v=dev";
 import { trainNotices } from "./notices.js?v=dev";
+import { inferDelay, restoreFeed } from "./delays.js?v=dev";
 
 // localStorage "tt-relay" overrides config.js, handy when testing a relay locally.
 const RELAY = ((() => { try { return localStorage.getItem("tt-relay"); } catch { return null; } })() ||
@@ -41,6 +42,9 @@ const state = {
   station: null,         // selected station id
   predictions: null,     // live MBTA predictions for the selected station
   showStations: store.get("tt-stations", true),
+  // Mark trains late when GPS shows a delay their railroad hasn't reported
+  // (js/delays.js).
+  inferDelays: store.get("tt-infer", true),
   // Miles or kilometers. The default follows the browser's language: miles in
   // the few countries that still use them, kilometers everywhere else.
   units: store.get("tt-units", /-(US|GB|LR|MM)\b/i.test(navigator.language || "en-US") ? "mi" : "km"),
@@ -824,6 +828,7 @@ function animateTo(duration = ANIM_MS) {
 function mergeTrains() {
   state.trains = new Map();
   for (const list of Object.values(state.bySource)) for (const t of list) state.trains.set(t.id, t);
+  applyInference();
   computePositions();
   animateTo();
   checkTracked();
@@ -832,6 +837,11 @@ function mergeTrains() {
     const t = state.trains.get(state.selected);
     if (t) map.easeTo({ center: [targetOf(t).lon, targetOf(t).lat], duration: ANIM_MS });
   }
+}
+
+// Delays the GPS proves but the railroad hasn't posted yet.
+function applyInference() {
+  for (const t of state.trains.values()) state.inferDelays ? inferDelay(t, state.stopPos) : restoreFeed(t);
 }
 
 // ---------- Feeds ----------
@@ -882,6 +892,7 @@ async function start() {
         .catch(() => {});
       for (const st of stations.values()) for (const m of st.members) state.stopPos.set(m.key, { lat: m.lat, lon: m.lon });
       snapStations();
+      applyInference();
       computePositions();
       redrawStations();
       if (wantedStation) selectStation(wantedStation);
@@ -1170,9 +1181,10 @@ function renderDetail() {
       <div class="hero-title">${t.number ? plate(t.number, a.color) : ""}<h2>${esc(trainTitle(t))}</h2></div>
       ${t.destination ? `<p class="od">${t.origin ? `${esc(t.origin)}<span class="arrow">→</span>` : "to "}<strong>${esc(t.destination)}</strong></p>` : ""}
       <div class="hero-actions">
-        ${t.statusText ? `<span class="pill ${statusClass(t)}">${esc(t.statusText)}</span>` : ""}
+        ${t.statusText ? `<span class="pill ${statusClass(t)}${t.inferred ? " inferred" : ""}"${t.inferred ? ` title="${INFERRED_TITLE}"` : ""}>${esc(t.statusText)}</span>` : ""}
         ${trackButton(t)}
       </div>
+      ${inferredNote(t)}
     </div>
     ${state.trackPicker === t.id ? trackPicker(t) : ""}
     ${noticesHtml(t)}
@@ -1181,6 +1193,23 @@ function renderDetail() {
     ${stops}`;
   // Re-rendering replaces the content; keep the reader where they were.
   el.scrollTop = keepScroll;
+}
+
+const INFERRED_TITLE = "Worked out by Milepost from GPS; not yet reported by the railroad";
+
+// Why Milepost thinks the train is later than its railroad says.
+function inferredNote(t) {
+  const n = t.inferred;
+  if (!n) return "";
+  const at = fmtTime(new Date(n.fix).toISOString(), n.tz);
+  const over = Math.max(1, Math.round((n.fix - n.posted) / 60000));
+  if (n.kind === "held") {
+    return `<p class="inferred-note">GPS had it still at <strong>${esc(n.stop)}</strong> at ${at}, ${over} min after its posted departure.
+      The railroad hasn’t reported this yet, so the times below include it.</p>`;
+  }
+  const d = distanceParts(n.meters);
+  return `<p class="inferred-note">GPS had it still ${d.value} ${d.unit} from <strong>${esc(n.stop)}</strong> at ${at}, ${over} min after its posted arrival,
+    so it can’t get there before ${fmtTime(new Date(n.earliest).toISOString(), n.tz)}. The railroad hasn’t reported this yet; the times below include it.</p>`;
 }
 
 function fmtIn(ms) {
@@ -1196,14 +1225,14 @@ function lateText(min) {
   return { text: `${Math.round(min)} min late`, cls: min <= 20 ? "warn" : "bad" };
 }
 
-function departureRow({ id, color, badge, title, sub, time, tz, status, statusCls }) {
+function departureRow({ id, color, badge, title, sub, time, tz, status, statusCls, inferred }) {
   const when = time
     ? `<span class="when"><strong>${fmtTime(new Date(time).toISOString(), tz)}</strong><span>${fmtIn(time)}</span></span>`
     : '<span class="when"><strong>Next</strong><span>stop</span></span>';
   const inner = `${when}
     ${plate(badge, color, "sm")}
     <span class="what"><span class="title">${esc(title)}</span><span class="sub">${esc(sub || "")}</span></span>
-    ${status ? `<span class="status ${statusCls}">${esc(status)}</span>` : "<span></span>"}`;
+    ${status ? `<span class="status ${statusCls}${inferred ? " inferred" : ""}"${inferred ? ` title="${INFERRED_TITLE}"` : ""}>${esc(status)}</span>` : "<span></span>"}`;
   return id
     ? `<button class="dep" data-select="${esc(id)}">${inner}</button>`
     : `<div class="dep">${inner}</div>`;
@@ -1241,7 +1270,7 @@ function renderStation() {
         id: t.id, color: a.color, badge: t.number || a.short,
         title: d.terminates && t.origin ? `from ${t.origin}` : t.destination ? `to ${t.destination}` : trainTitle(t),
         sub: [d.terminates && "Arriving", a.short, t.route].filter(Boolean).join(" · "),
-        time: d.time, tz: d.tz, status: late.text, statusCls: late.cls,
+        time: d.time, tz: d.tz, status: late.text, statusCls: late.cls, inferred: Boolean(t.inferred) && !d.here,
       }),
     });
   }
@@ -1449,7 +1478,7 @@ function renderTracked() {
         where = `to <strong>${esc(t.destination)}</strong>`;
       }
       const late = lateText(t.delayMin);
-      if (late.text) status = `<span class="status ${late.cls}">${late.text}</span>`;
+      if (late.text) status = `<span class="status ${late.cls}${t.inferred ? " inferred" : ""}"${t.inferred ? ` title="${INFERRED_TITLE}"` : ""}>${late.text}</span>`;
       if (Date.now() - t.updated > STALE_MS && !t.estimated) warn = `<span class="stale">⚠ Position ${fmtAgo(t.updated)}</span>`;
     } else {
       where = rec.stopName ? `to <strong>${esc(rec.stopName)}</strong>` : "";
@@ -1909,6 +1938,13 @@ function setShowStations(on) {
 }
 on("stations-toggle", "change", (e) => setShowStations(e.target.checked));
 
+on("infer-toggle", "change", (e) => {
+  state.inferDelays = e.target.checked;
+  store.set("tt-infer", state.inferDelays);
+  applyInference();
+  renderAll();
+});
+
 function toggleMenu(open = $("settings-menu").hidden) {
   const menu = $("settings-menu"), btn = $("settings-btn");
   menu.hidden = !open;
@@ -1933,6 +1969,7 @@ map.on("movestart", () => toggleMenu(false));
 applyTheme();
 applyUnits();
 setChecked("stations-toggle", state.showStations);
+setChecked("infer-toggle", state.inferDelays);
 
 // Phone bottom sheet: collapsed / normal / expanded.
 function setSheet(mode) {

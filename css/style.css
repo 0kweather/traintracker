@@ -685,6 +685,10 @@ button.dep:hover, button.dep:focus-visible { background: var(--hover); outline: 
 .pill.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
 .pill.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
 .pill.neutral { background: var(--hover); color: var(--muted); }
+/* A delay Milepost worked out from GPS that the railroad hasn't posted. */
+.pill.inferred, .status.inferred { text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-thickness: 1.5px; cursor: help; }
+.inferred-note { margin: var(--s3) 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
+.inferred-note strong { color: var(--text); font-weight: 600; }
 
 /* Train details as a row of small rounded chips. */
 .meta {

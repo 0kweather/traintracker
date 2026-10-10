@@ -45,6 +45,7 @@
         <details>
           <summary>About the data</summary>
           <p>Positions come from each railroad's public real-time feed and refresh every 20–60 seconds. Trains marked <em>estimated</em> are placed between stations using predicted arrival times because their feed doesn't report GPS.</p>
+          <p>Railroads often don't post a delay until well after it starts. Milepost watches GPS for trains still at a station after their posted departure, or too far out to make their next stop on time, and adds that delay itself. Those delays are underlined with dots. You can turn this off in Settings.</p>
           <p id="credits"></p>
           <p><a href="https://github.com/0kweather/milepost">Source on GitHub</a></p>
         </details>
@@ -83,6 +84,12 @@
       <input type="checkbox" id="stations-toggle">
       <span class="switch" aria-hidden="true"></span>
       <span class="toggle-text"><strong>Show stations</strong><span>Station markers and names on the map</span></span>
+    </label>
+    <div class="menu-title">Delays</div>
+    <label class="toggle">
+      <input type="checkbox" id="infer-toggle">
+      <span class="switch" aria-hidden="true"></span>
+      <span class="toggle-text"><strong>Catch unreported delays</strong><span>Mark a train late when GPS shows it running behind what its railroad reports</span></span>
     </label>
   </div>
 

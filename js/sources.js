@@ -3,7 +3,7 @@
 // Every source turns its feed into a list of plain "train" objects:
 //   { id, agency, number, route, routeColor, lat, lon, bearing, speedMph,
 //     origin, destination, nextStop, delayMin, statusText, updated,
-//     estimated, stops: [{ name, time, status }] }
+//     estimated, stops: [{ key, name, time, status, arr, dep, ... }] }
 //
 // "direct" sources send CORS headers, so the browser can read them from any
 // site. "relay" sources don't (or need an API key), so they go through the
@@ -46,7 +46,7 @@ function bearingBetween(a, b) {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
-function delayText(min) {
+export function delayText(min) {
   if (min == null || Number.isNaN(min)) return null;
   if (min <= 1) return "On time";
   if (min < 60) return `${Math.round(min)} min late`;
@@ -77,6 +77,15 @@ function departureDay(first) {
   }
 }
 
+// When the train's GPS position was taken, if the feed says so reliably.
+// Some Amtrak trains report local time under the wrong offset (hours in the
+// future), and Brightline's time is just when the data was fetched.
+function fixTime(agency, ts) {
+  const t = Date.parse(ts);
+  if (agency === "brightline" || !t || t > Date.now() + 60000) return null;
+  return t;
+}
+
 const AMTRAKER_PROVIDERS = { Amtrak: "amtrak", Via: "via", Brightline: "brightline" };
 
 function parseAmtraker(json) {
@@ -103,7 +112,8 @@ function parseAmtraker(json) {
         nextStop: next ? next.name : null,
         delayMin,
         statusText: delayText(delayMin),
-        updated: Date.parse(t.lastValTS) || Date.now(),
+        updated: Math.min(Date.parse(t.lastValTS) || Date.now(), Date.now()),
+        fixAt: fixTime(agency, t.lastValTS),
         alerts: (t.alerts || []).map((a) => a.message).filter(Boolean), // official notices for this train
         // Long-distance trains run for days, so the same number can be on the map twice.
         departedOn: departureDay(stations[0]),
@@ -113,6 +123,7 @@ function parseAmtraker(json) {
           tz: s.tz,
           time: s.status === "Departed" ? s.dep || s.arr : s.arr || s.dep,
           scheduled: s.schArr || s.schDep,
+          arr: s.arr || null, dep: s.dep || null, schArr: s.schArr || null, schDep: s.schDep || null,
           status: s.status === "Departed" ? "past" : s === next ? "next" : "future",
           here: s.status === "Station", // standing at this station right now
         })),
@@ -211,6 +222,8 @@ function mtaStops(agency, list, lookup, now, nextStop, dwellingAt) {
     name: lookup[s.stopId][0],
     tz: "America/New_York",
     time: new Date(evTime(s) * 1000).toISOString(),
+    arr: s.arrival?.time ? new Date(s.arrival.time * 1000).toISOString() : null,
+    dep: s.departure?.time ? new Date(s.departure.time * 1000).toISOString() : null,
     status: s === nextStop ? "next" : evTime(s) < now ? "past" : "future",
   }));
 }
@@ -261,6 +274,7 @@ function parseMta(agency, buf, meta) {
       delayMin: delaySec != null ? delaySec / 60 : null,
       statusText: prog.dwelling ? `At ${lookup[prog.at.stopId][0]}` : delaySec != null ? delayText(delaySec / 60) : null,
       updated: fresh ? vp.timestamp * 1000 : (feed.timestamp || now) * 1000,
+      fixAt: fresh ? vp.timestamp * 1000 : null,
       estimated: !fresh,
       leg: fresh ? null : prog.leg || null,
       stops: mtaStops(agency, prog.list, lookup, now, nextStop, prog.dwelling ? prog.at : null),
