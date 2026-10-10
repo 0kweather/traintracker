@@ -575,13 +575,6 @@ function visible(t) {
   return true;
 }
 
-function labelFor(t) {
-  const a = AGENCIES[t.agency];
-  if (t.number) return `${a.short} ${t.number}`;
-  if (t.route && t.route !== a.short) return `${a.short} ${t.route}`;
-  return a.short;
-}
-
 function featureCollection() {
   const features = [];
   for (const t of state.trains.values()) {
@@ -1070,7 +1063,7 @@ function renderResults() {
     const sub = [t.destination && `to ${t.destination}`, t.nextStop && !t.destination && `next ${t.nextStop}`, t.departedOn && `left ${t.departedOn}`]
       .filter(Boolean).join(" · ") || a.region;
     return `<button class="result" data-select="${esc(t.id)}">
-      <span class="badge" style="background:${a.color}">${esc(t.number || a.short)}</span>
+      ${plate(t.number || a.short, a.color, "sm")}
       <span><span class="title">${esc(trainTitle(t))}</span><br><span class="sub">${esc(a.short)} · ${esc(sub)}</span></span>
       ${t.statusText ? `<span class="status ${statusClass(t)}">${esc(t.statusText)}</span>` : ""}
     </button>`;
@@ -1487,7 +1480,7 @@ function renderTracked() {
     return `<div class="track-card" style="--c:${a.color}" role="button" tabindex="0" data-track-open="${esc(rec.id)}">
       <span class="bar"></span>
       <span class="tc-main">
-        <span class="tc-title"><strong>${esc(trainLabel(rec))}</strong>${rec.route ? ` · ${esc(rec.route)}` : ""}</span>
+        <span class="tc-title">${plate(rec.number || a.short, a.color, "xs")}<span>${esc(rec.route || AGENCIES[rec.agency]?.name || "")}</span></span>
         ${where ? `<span class="tc-where">${where}</span>` : ""}
         ${status || warn ? `<span class="tc-status">${status}${warn}</span>` : ""}
       </span>
@@ -1734,8 +1727,7 @@ map.on("mousemove", "tt-trains", (e) => {
   const a = AGENCIES[t.agency];
   popup
     .setLngLat(e.features[0].geometry.coordinates)
-    .setHTML(`<div class="t" style="color:${a.color}">${esc(labelFor(t))}</div>
-      <div>${esc(trainTitle(t))}</div>
+    .setHTML(`<div class="t">${plate(t.number || a.short, a.color, "xs")}<span>${esc(trainTitle(t))}</span></div>
       <div class="s">${t.destination ? `to ${esc(t.destination)}` : ""}${t.statusText ? ` · ${esc(t.statusText)}` : ""}</div>`)
     .addTo(map);
 });

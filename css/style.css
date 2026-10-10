@@ -232,8 +232,8 @@ a { color: var(--accent); }
 .track-card:hover, .track-card:focus-visible { border-color: var(--c); outline: none; }
 .track-card .bar { align-self: stretch; background: var(--c); border-radius: 0 3px 3px 0; }
 .tc-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; font-size: var(--fs-xs); }
-.tc-title { font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tc-title strong { color: var(--c); }
+.tc-title { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-sm); font-weight: 600; min-width: 0; padding: 2px 0 2px 2px; }
+.tc-title > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tc-where { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tc-status { display: flex; gap: var(--s2); align-items: center; flex-wrap: wrap; }
 .tc-status .stale { color: var(--warn); font-weight: 600; }
@@ -502,7 +502,7 @@ a { color: var(--accent); }
 
 .result {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto; /* long names wrap instead of pushing the status off the edge */
   gap: var(--s3);
   align-items: center;
   width: 100%;
@@ -518,19 +518,6 @@ a { color: var(--accent); }
 .result .sub { font-size: var(--fs-xs); color: var(--muted); }
 .empty { padding: var(--s4) var(--s2); color: var(--muted); }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  padding: var(--s1) var(--s2);
-  border-radius: var(--r-sm);
-  color: #fff;
-  font-weight: 700;
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 
 .status { font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
 .status.good { color: var(--good); }
@@ -672,6 +659,11 @@ button.dep:hover, button.dep:focus-visible { background: var(--hover); outline: 
 .plate.sm { min-width: 48px; }
 .plate.sm::before { height: 4px; }
 .plate.sm > span { font-size: var(--fs-lg); padding: 1px 6px 2px; }
+
+/* Smallest plate, inline with a line of text (tracked cards, map hover). */
+.plate.xs { min-width: 0; box-shadow: 0 0 0 1.25px #121417; border-radius: 4px; }
+.plate.xs::before { height: 3px; }
+.plate.xs > span { font-size: var(--fs-sm); font-weight: 750; padding: 0 5px 1px; line-height: 1.2; }
 
 .pill {
   display: inline-block;
@@ -820,7 +812,7 @@ button.dep:hover, button.dep:focus-visible { background: var(--hover); outline: 
 }
 
 .maplibregl-popup-tip { display: none; }
-.hover-card .t { font-weight: 650; }
+.hover-card .t { display: flex; align-items: center; gap: var(--s2); font-weight: 650; padding: 2px 0 2px 2px; }
 .rail-net { display: flex; align-items: center; gap: var(--s2); font-size: var(--fs-xs); line-height: 1.6; }
 .rail-net .dot { width: 14px; height: 4px; border-radius: 2px; }
 .hover-card .s { color: var(--muted); font-size: var(--fs-xs); }
